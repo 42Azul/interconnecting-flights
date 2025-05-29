@@ -1,0 +1,64 @@
+openapi: 3.0.1
+info:
+  title: Ryanair Interconnections API
+  version: 1.0.0
+paths:
+  /v1/interconnections:
+    get:
+      summary: Get direct and 1-stop interconnections
+      parameters:
+        - name: departure
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: arrival
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: departureDateTime
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - name: arrivalDateTime
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: List of valid flight connections
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Connection'
+components:
+  schemas:
+    Connection:
+      type: object
+      properties:
+        stops:
+          type: integer
+        legs:
+          type: array
+          items:
+            $ref: '#/components/schemas/Leg'
+    Leg:
+      type: object
+      properties:
+        departureAirport:
+          type: string
+        arrivalAirport:
+          type: string
+        departureDateTime:
+          type: string
+          format: date-time
+        arrivalDateTime:
+          type: string
+          format: date-time
