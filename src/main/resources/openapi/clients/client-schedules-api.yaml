@@ -1,0 +1,74 @@
+openapi: 3.0.1
+info:
+  title: Ryanair Schedules API
+  version: 1.0.0
+paths:
+  /timtbl/3/schedules/{departure}/{arrival}/years/{year}/months/{month}:
+    get:
+      operationId: GetSchedule
+      tags:
+        - schedules
+      summary: Get flight schedules for given month
+      parameters:
+        - name: departure
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: arrival
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: year
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: month
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Schedule data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduleResponse'
+components:
+  schemas:
+    ScheduleResponse:
+      type: object
+      properties:
+        month:
+          type: integer
+        days:
+          type: array
+          items:
+            $ref: '#/components/schemas/DaySchedule'
+    DaySchedule:
+      type: object
+      properties:
+        day:
+          type: integer
+        flights:
+          type: array
+          items:
+            $ref: '#/components/schemas/Flight'
+    Flight:
+      type: object
+      properties:
+        number:
+          type: string
+        departureTime:
+          type: string
+          format: time
+          pattern: '^([01]\\d|2[0-3]):[0-5]\\d$'
+          example: "16:00"
+        arrivalTime:
+          type: string
+          format: time
+          pattern: '^([01]\\d|2[0-3]):[0-5]\\d$'
+          example: "18:35"

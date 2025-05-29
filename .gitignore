@@ -30,3 +30,7 @@ build/
 
 ### VS Code ###
 .vscode/
+
+
+##OpenAPI
+_merged_spec.yaml
