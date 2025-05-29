@@ -1,4 +1,4 @@
-package com.ryanair.test.interconnecting_flights;
+package com.ryanair.interconnector;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
