@@ -29,7 +29,7 @@
         <url/>
     </scm>
     <properties>
-        <java.version>24</java.version>
+        <java.version>17</java.version>
         <openapi-generator.version>7.13.0</openapi-generator.version>
         <jacoco.version>0.8.13</jacoco.version>
         <spotbugs.version>4.9.3.0</spotbugs.version>
@@ -63,6 +63,11 @@
             <optional>true</optional>
         </dependency>
 
+        <dependency>
+            <groupId>io.projectreactor</groupId>
+            <artifactId>reactor-core</artifactId>
+        </dependency>
+
         <!-- OpenApi dependencies -->
         <dependency>
             <groupId>io.swagger.core.v3</groupId>
@@ -82,6 +87,7 @@
             <version>${springdoc.openapi.version}</version>
         </dependency>
 
+        <!-- OpenFeign for external API clients -->
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-openfeign</artifactId>
@@ -101,6 +107,12 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <dependency>
+            <groupId>io.projectreactor</groupId>
+            <artifactId>reactor-test</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -115,7 +127,7 @@
                 <version>${openapi-generator.version}</version>
 
                 <executions>
-                    <!-- External API clients code generation with OpenFeign -->
+                    <!-- External API clients code generation -->
                     <execution>
                         <id>generate-external-clients</id>
                         <goals>
@@ -152,7 +164,7 @@
                         </configuration>
                     </execution>
 
-                    <!-- Actual API server code generation -->
+                    <!-- API server code generation -->
                     <execution>
                         <id>generate-interconnections-server</id>
                         <goals>
@@ -174,6 +186,7 @@
                                 <interfaceOnly>true</interfaceOnly>
                                 <useTags>true</useTags>
                                 <skipDefaultInterface>true</skipDefaultInterface>
+                                <useResponseEntity>false</useResponseEntity>
                             </configOptions>
                             <typeMappings>
                                 <typeMapping>local-date-time=LocalDateTime</typeMapping>
@@ -193,6 +206,13 @@
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <version>${jacoco.version}</version>
+                <configuration>
+                    <!-- These are the OpenAPI generated sources, which we do not need to cover in the report -->
+                    <excludes>
+                        <exclude>com/ryanair/interconnectingflights/external/model/**</exclude>
+                        <exclude>com/ryanair/interconnectingflights/model/**</exclude>
+                    </excludes>
+                </configuration>
                 <executions>
                     <execution>
                         <goals>

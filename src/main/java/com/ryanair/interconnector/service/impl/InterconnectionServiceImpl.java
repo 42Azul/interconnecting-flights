@@ -1,57 +1,110 @@
 package com.ryanair.interconnector.service.impl;
 
 import com.ryanair.interconnectingflights.model.Connection;
-import com.ryanair.interconnectingflights.model.Leg;
-import com.ryanair.interconnector.client.RoutesClient;
-import com.ryanair.interconnector.client.SchedulesClient;
+import com.ryanair.interconnector.dto.FlightSlot;
+import com.ryanair.interconnector.mapping.ConnectionMapper;
 import com.ryanair.interconnector.service.InterconnectionService;
+import com.ryanair.interconnector.service.RouteQueryService;
+import com.ryanair.interconnector.service.ScheduleQueryService;
+import com.ryanair.interconnector.validation.FlightConnectionValidator;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
-import java.time.LocalDate;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
 import java.util.List;
 
 @Service
+@Slf4j
 public class InterconnectionServiceImpl implements InterconnectionService {
 
+  private final ScheduleQueryService scheduleQueryService;
+  private final RouteQueryService routeQueryService;
+  private final ConnectionMapper connectionMapper;
+  private final List<FlightConnectionValidator>  flightConnectionValidators;
 
-    private final RoutesClient routesClient;
-    private final SchedulesClient schedulesClient;
+  @Autowired
+  public InterconnectionServiceImpl(
+      ScheduleQueryService scheduleQueryService,
+      RouteQueryService routeQueryService,
+      ConnectionMapper connectionMapper,
+      List<FlightConnectionValidator> flightConnectionValidators
+  ) {
+    this.scheduleQueryService = scheduleQueryService;
+    this.routeQueryService = routeQueryService;
+    this.connectionMapper = connectionMapper;
+    this.flightConnectionValidators = flightConnectionValidators;
+  }
 
-    @Autowired
-    public InterconnectionServiceImpl(RoutesClient routesClient, SchedulesClient schedulesClient) {
-        this.routesClient = routesClient;
-        this.schedulesClient = schedulesClient;
-    }
+  @Override
+  public Flux<Connection> findInterconnections(
+      String departure,
+      String arrival,
+      LocalDateTime departureDateTime,
+      LocalDateTime arrivalDateTime) {
 
-    // Missing edge case handling for change of month in the range and further improvements/code cleanup
+    return Flux.merge(
+        getSingleLegConnections(departure, arrival, departureDateTime, arrivalDateTime),
+        getMultiLegConnections(departure, arrival, departureDateTime, arrivalDateTime)
+    );
+  }
 
-    @Override
-    public List<Connection> findInterconnections(String departure, String arrival, LocalDateTime departureDateTime, LocalDateTime arrivalDateTime) {
-        return routesClient.fetchAllRoutes().stream().filter(route -> route.getAirportFrom().equalsIgnoreCase(departure) && route.getAirportTo().equalsIgnoreCase(arrival)).filter(route -> route.getOperator() != null).filter(route -> route.getOperator().equalsIgnoreCase("RYANAIR")).flatMap(route -> {
-            //TODO Edge case change of month in the range! Not only considering the month of departureDateTime!
-            Integer year = departureDateTime.getYear();
-            Integer month = departureDateTime.getMonthValue();
-            return schedulesClient
-                    .getSchedule(route.getAirportFrom(), route.getAirportTo(), year, month).getDays()
-                    .stream()
-                    .filter(day -> day.getFlights() != null)
-                    .flatMap(day ->
-                            day
-                                    .getFlights()
-                                    .stream()
-                                    .filter(flight -> departureDateTime.toLocalTime().isBefore(flight.getDepartureTime()) && arrivalDateTime.toLocalTime().isAfter(flight.getArrivalTime()))
-                                    .map(flight -> {
-                                        LocalDate flightDate = LocalDate.of(year, month, day.getDay());
-                                        LocalDateTime offsetArrivalFlight = LocalDateTime.of(flightDate, flight.getArrivalTime());
-                                        LocalDateTime offsetDepartureFlight = LocalDateTime.of(flightDate, flight.getDepartureTime());
-                                        Leg leg = new Leg().departureAirport(departure).arrivalAirport(arrival).arrivalDateTime(offsetArrivalFlight).departureDateTime(offsetDepartureFlight);
-                                        return new Connection().stops(0).legs(List.of(leg));
-                                    }));
-        }).toList();
+  private Flux<Connection> getSingleLegConnections(
+      String departure,
+      String arrival,
+      LocalDateTime departureDateTime,
+      LocalDateTime arrivalDateTime) {
+    return routeQueryService.existsDirectRoute(departure, arrival)
+        .doOnNext((valid) -> log.atInfo().setMessage("Single leg connections from {} to {} are {}")
+            .addArgument(departure)
+            .addArgument(arrival)
+            .addArgument(valid ? "EXISTING" : "NOT EXISTING")
+            .log())
+        .flatMapMany(valid ->
+            valid
+                ? scheduleQueryService.findFlightSlots(departure, arrival, departureDateTime, arrivalDateTime)
+                : Flux.empty())
+        .flatMap(slot -> Mono.justOrEmpty(connectionMapper.toSingleLegConnection(departure, arrival, slot)));
+  }
+
+  private Flux<Connection> getMultiLegConnections(
+      String departure,
+      String arrival,
+      LocalDateTime minimumDepartureTime,
+      LocalDateTime maximumArrivalTime) {
+
+    return routeQueryService.intermediateAirports(departure, arrival)
+        .doOnNext(set -> log.atInfo().setMessage("Finding multi-leg connections from {} to {} with common airports: {}")
+            .addArgument(departure)
+            .addArgument(arrival)
+            .addArgument(set.size())
+            .log())
+        .flatMapMany(Flux::fromIterable)
+        .flatMap(intermediate ->
+            buildConnectionsVia(departure, intermediate, arrival, minimumDepartureTime, maximumArrivalTime));
+  }
+
+  private Flux<Connection> buildConnectionsVia(
+      String departure,
+      String intermediate,
+      String arrival,
+      LocalDateTime minimumDepartureTime,
+      LocalDateTime maximumArrivalTime) {
+
+    return Mono.zip(
+            scheduleQueryService.findFlightSlots(departure, intermediate, minimumDepartureTime, maximumArrivalTime).collectList(),
+            scheduleQueryService.findFlightSlots(intermediate, arrival,  minimumDepartureTime, maximumArrivalTime).collectList())
+        .flatMapMany(firstAndSecondSlots -> Flux.fromIterable(firstAndSecondSlots.getT1())
+            .flatMap(firstSlot -> Flux.fromIterable(firstAndSecondSlots.getT2())
+                .filter(secondSlot -> isValidConnection(firstSlot, secondSlot))
+                .flatMap(secondSlot -> Mono.justOrEmpty(connectionMapper.toMultiLegConnection(departure, intermediate, arrival, firstSlot, secondSlot)))));
+  }
 
 
-    }
+  private boolean isValidConnection(FlightSlot firstSlot, FlightSlot secondSlot) {
+    return flightConnectionValidators.stream().allMatch(validator -> validator.isValidConnection(firstSlot, secondSlot));
+  }
 }
+
+
