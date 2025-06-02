@@ -1,0 +1,13 @@
+{
+  "request": {
+    "method": "GET",
+    "url": "/views/locate/3/routes"
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "/routes/routes-response.json",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

@@ -7,6 +7,7 @@ import com.ryanair.interconnector.service.InterconnectionService;
 import com.ryanair.interconnector.service.RouteQueryService;
 import com.ryanair.interconnector.service.ScheduleQueryService;
 import com.ryanair.interconnector.validation.FlightConnectionValidator;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -24,6 +25,10 @@ public class InterconnectionServiceImpl implements InterconnectionService {
   private final ConnectionMapper connectionMapper;
   private final List<FlightConnectionValidator>  flightConnectionValidators;
 
+  @SuppressFBWarnings(
+      value = "EI_EXPOSE_REP2",
+      justification = "List is injected by Spring and not exposed"
+  )
   @Autowired
   public InterconnectionServiceImpl(
       ScheduleQueryService scheduleQueryService,
@@ -44,7 +49,7 @@ public class InterconnectionServiceImpl implements InterconnectionService {
       LocalDateTime departureDateTime,
       LocalDateTime arrivalDateTime) {
 
-    return Flux.merge(
+    return Flux.concat(
         getSingleLegConnections(departure, arrival, departureDateTime, arrivalDateTime),
         getMultiLegConnections(departure, arrival, departureDateTime, arrivalDateTime)
     );
