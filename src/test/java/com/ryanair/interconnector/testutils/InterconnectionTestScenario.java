@@ -8,6 +8,7 @@ import lombok.Setter;
 import lombok.experimental.Accessors;
 
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,12 +22,6 @@ import java.util.stream.Stream;
 @AllArgsConstructor
 public class InterconnectionTestScenario {
 
-  private final String departure;
-  private final String arrival;
-  private final String departureDateTime;
-  private final String arrivalDateTime;
-  private final List<Connection> expectedConnections;
-
   private static final String DUB = "DUB";
   private static final String STN = "STN";
   private static final String WRO = "WRO";
@@ -38,6 +33,13 @@ public class InterconnectionTestScenario {
   private static final String DEPARTURE_DATE_INVALID = "2023-06-01";
   private static final String ARRIVAL_DATE_INVALID = "2023-06-01";
 
+  private final String departure;
+  private final String arrival;
+  private final String departureDateTime;
+  private final String arrivalDateTime;
+  private final List<Connection> expectedConnections;
+
+
   public Map<String, String> asQueryParams() {
     return Stream.of(
             Optional.ofNullable(departure).map(v -> Map.entry("departure", v)),
@@ -47,6 +49,10 @@ public class InterconnectionTestScenario {
         )
         .flatMap(Optional::stream)
         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+  }
+
+  public YearMonth getDepartureYearMonth() {
+    return YearMonth.from(LocalDateTime.parse(departureDateTime));
   }
 
 

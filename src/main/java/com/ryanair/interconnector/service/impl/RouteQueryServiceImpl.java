@@ -6,6 +6,7 @@ import com.ryanair.interconnector.service.RouteQueryService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -25,37 +26,39 @@ public class RouteQueryServiceImpl implements RouteQueryService {
   @Override
   public Mono<Set<String>> intermediateAirports(String from, String to) {
 
-    Mono<Set<String>> reachableFromOrigin = routesClient.fetchAllRoutesAsync()
-        .filter(this::isValidRoute)
-        .filter(r -> from.equalsIgnoreCase(r.getAirportFrom()))
-        .map(Route::getAirportTo)
-        .collect(Collectors.toSet());
+    return routesClient.fetchAllRoutesAsync()
+        .map(routes -> {
+          Set<String> fromOrigin = new HashSet<>();
+          Set<String> toDestination = new HashSet<>();
 
+          routes.stream()
+              .filter(this::isValidRoute)
+              .forEach(route -> {
+                if (from.equalsIgnoreCase(route.getAirportFrom())) {
+                  fromOrigin.add(route.getAirportTo());
+                }
+                if (to.equalsIgnoreCase(route.getAirportTo())) {
+                  toDestination.add(route.getAirportFrom());
+                }
+              });
 
-    Mono<Set<String>> reachableToDestination = routesClient.fetchAllRoutesAsync()
-        .filter(this::isValidRoute)
-        .filter(r -> to.equalsIgnoreCase(r.getAirportTo()))
-        .map(Route::getAirportFrom)
-        .collect(Collectors.toSet());
-
-    return Mono.zip(reachableFromOrigin, reachableToDestination)
-        .map(tuple -> {
-          Set<String> intersection = new HashSet<>(tuple.getT1());
-          intersection.retainAll(tuple.getT2());
-          return intersection;
-        });
+          fromOrigin.retainAll(toDestination);
+          return fromOrigin;
+        }).defaultIfEmpty(Collections.emptySet());
   }
-
 
   @Override
   public Mono<Boolean> existsDirectRoute(String from, String to) {
     return routesClient.fetchAllRoutesAsync()
-        .filter(this::isValidRoute)
-        .any(route -> from.equalsIgnoreCase(route.getAirportFrom()) &&
-                           to.equalsIgnoreCase(route.getAirportTo()));
+        .map(routes -> routes.stream()
+            .filter(this::isValidRoute)
+            .anyMatch(route ->
+                from.equalsIgnoreCase(route.getAirportFrom()) &&
+                    to.equalsIgnoreCase(route.getAirportTo())))
+        .defaultIfEmpty(false);
   }
 
-  private boolean isValidRoute(Route route){
+  private boolean isValidRoute(Route route) {
     return OPERATOR.equals(route.getOperator());
   }
 

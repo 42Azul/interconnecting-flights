@@ -54,7 +54,7 @@ class RouteQueryServiceImplTest {
     })
     void shouldReturnTrueWhenValidRouteExists(String originAirport, String destinationAirport) {
       // Arrange
-      when(routesClient.fetchAllRoutesAsync()).thenReturn(Flux.just(validRoute, invalidRoute));
+      when(routesClient.fetchAllRoutesAsync()).thenReturn(Mono.just(List.of(validRoute, invalidRoute)));
 
       // Act
       Mono<Boolean> result = service.existsDirectRoute(originAirport, destinationAirport);
@@ -69,7 +69,7 @@ class RouteQueryServiceImplTest {
     @Test
     void shouldReturnFalseIfNoMatchingRouteExistsWithValidOperator() {
       // Arrange
-      when(routesClient.fetchAllRoutesAsync()).thenReturn(Flux.just(invalidRoute));
+      when(routesClient.fetchAllRoutesAsync()).thenReturn(Mono.just(List.of(invalidRoute)));
 
       // Act
       Mono<Boolean> result = service.existsDirectRoute(ORIGIN_AIRPORT, DESTINATION_AIRPORT);
@@ -83,7 +83,7 @@ class RouteQueryServiceImplTest {
     @Test
     void shouldReturnFalseIfNoRoutesExist() {
       // Arrange
-      when(routesClient.fetchAllRoutesAsync()).thenReturn(Flux.empty());
+      when(routesClient.fetchAllRoutesAsync()).thenReturn(Mono.empty());
 
       // Act
       Mono<Boolean> result = service.existsDirectRoute(ORIGIN_AIRPORT, DESTINATION_AIRPORT);
@@ -99,7 +99,7 @@ class RouteQueryServiceImplTest {
       // Arrange
       Route differentRoute = new Route().airportFrom(ORIGIN_AIRPORT).airportTo("ABC").operator(VALID_OPERATOR);
       Route anotherDifferentRoute = new Route().airportFrom("LMN").airportTo(DESTINATION_AIRPORT).operator(VALID_OPERATOR);
-      when(routesClient.fetchAllRoutesAsync()).thenReturn(Flux.just(differentRoute, anotherDifferentRoute));
+      when(routesClient.fetchAllRoutesAsync()).thenReturn(Mono.just(List.of(differentRoute, anotherDifferentRoute)));
 
       // Act
       Mono<Boolean> result = service.existsDirectRoute(ORIGIN_AIRPORT, DESTINATION_AIRPORT);
@@ -146,7 +146,7 @@ class RouteQueryServiceImplTest {
     void shouldReturnIntersectionRegardlessOfFluxOrder(List<Route> routesInAnyOrder) {
       // Arrange
       when(routesClient.fetchAllRoutesAsync())
-          .thenReturn(Flux.fromIterable(routesInAnyOrder));
+          .thenReturn(Mono.just(routesInAnyOrder));
 
       Set<String> expected = Set.of(INTERMEDIATE_AIRPORT_1, INTERMEDIATE_AIRPORT_2);
 
@@ -163,7 +163,7 @@ class RouteQueryServiceImplTest {
     void shouldReturnIntersectionCaseInsensitive() {
       // Arrange
       when(routesClient.fetchAllRoutesAsync())
-          .thenReturn(Flux.just(FROM_ROUTE_1, TO_ROUTE_1));
+          .thenReturn(Mono.just(List.of(FROM_ROUTE_1, TO_ROUTE_1)));
 
       // Act
       Mono<Set<String>> result = service.intermediateAirports(ORIGIN_AIRPORT_LOWER, DESTINATION_AIRPORT_LOWER);
@@ -178,7 +178,7 @@ class RouteQueryServiceImplTest {
     void shouldReturnEmptyIfNoIntersection() {
       // Arrange
       when(routesClient.fetchAllRoutesAsync())
-          .thenReturn(Flux.just(FROM_ROUTE_1, TO_ROUTE_2));
+          .thenReturn(Mono.just(List.of(FROM_ROUTE_1, TO_ROUTE_2)));
 
       // Act
       Mono<Set<String>> result = service.intermediateAirports(ORIGIN_AIRPORT, DESTINATION_AIRPORT);
@@ -202,7 +202,7 @@ class RouteQueryServiceImplTest {
       Route wrongOperator1 = new Route().airportFrom(ORIGIN_AIRPORT).airportTo(INTERMEDIATE_AIRPORT_1).operator(operatorFirstFlight);
       Route wrongOperator2 = new Route().airportFrom(INTERMEDIATE_AIRPORT_1).airportTo(DESTINATION_AIRPORT).operator(operatorSecondFlight);
 
-      when(routesClient.fetchAllRoutesAsync()).thenReturn(Flux.just(wrongOperator1, wrongOperator2));
+      when(routesClient.fetchAllRoutesAsync()).thenReturn(Mono.just(List.of(wrongOperator1, wrongOperator2)));
 
       // Act
       Mono<Set<String>> result = service.intermediateAirports(ORIGIN_AIRPORT, DESTINATION_AIRPORT);

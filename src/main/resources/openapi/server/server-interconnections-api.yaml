@@ -41,6 +41,18 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Connection'
+        '400':
+          description: Bad request, e.g. missing parameters or invalid date format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error, e.g. database connection issues
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 components:
   schemas:
     Connection:
@@ -65,3 +77,16 @@ components:
         arrivalDateTime:
           type: string
           format: local-date-time
+    Error:
+      type: object
+      properties:
+        code:
+          type: integer
+          example: 4001
+        message:
+          type: string
+          example: "Invalid input parameters"
+        details:
+          type: string
+          example: "The departure date must be in the future and in ISO 8601 format"
+
