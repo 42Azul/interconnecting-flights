@@ -1,0 +1,82 @@
+{
+  "mappings": [
+    {
+      "request": {
+        "method": "GET",
+        "url": "/timtbl/3/schedules/DUB/WRO/years/2023/months/6"
+      },
+      "response": {
+        "status": 200,
+        "bodyFileName": "/schedules/schedule-dub-wro-06-2023.json",
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "/timtbl/3/schedules/DUB/WRO/years/2023/months/7"
+      },
+      "response": {
+        "status": 200,
+        "bodyFileName": "/schedules/schedule-dub-wro-07-2023.json",
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "/timtbl/3/schedules/STN/WRO/years/2023/months/6"
+      },
+      "response": {
+        "status": 200,
+        "bodyFileName": "/schedules/schedule-stn-wro-06-2023.json",
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "/timtbl/3/schedules/STN/WRO/years/2023/months/7"
+      },
+      "response": {
+        "status": 200,
+        "bodyFileName": "/schedules/schedule-empty-07-2023.json",
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "/timtbl/3/schedules/DUB/STN/years/2023/months/6"
+      },
+      "response": {
+        "status": 200,
+        "bodyFileName": "/schedules/schedule-dub-stn-06-2023.json",
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "GET",
+        "url": "/timtbl/3/schedules/DUB/STN/years/2023/months/7"
+      },
+      "response": {
+        "status": 200,
+        "bodyFileName": "/schedules/schedule-empty-07-2023.json",
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      }
+    }
+  ]
+}

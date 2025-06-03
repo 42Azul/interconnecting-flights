@@ -1,0 +1,38 @@
+[
+  {
+    "airportFrom": "DUB",
+    "airportTo": "STN",
+    "connectingAirport": null,
+    "newRoute": false,
+    "seasonalRoute": false,
+    "operator": "RYANAIR",
+    "group": "ETHNIC"
+  },
+  {
+    "airportFrom": "STN",
+    "airportTo": "WRO",
+    "connectingAirport": null,
+    "newRoute": false,
+    "seasonalRoute": false,
+    "operator": "RYANAIR",
+    "group": "DOMESTIC"
+  },
+  {
+    "airportFrom": "DUB",
+    "airportTo": "WRO",
+    "connectingAirport": null,
+    "newRoute": false,
+    "seasonalRoute": false,
+    "operator": "RYANAIR",
+    "group": "ETHNIC"
+  },
+  {
+    "airportFrom": "ALC",
+    "airportTo": "MRS",
+    "connectingAirport": null,
+    "newRoute": false,
+    "seasonalRoute": false,
+    "operator": "OTHER",
+    "group": "ETHNIC"
+  }
+]

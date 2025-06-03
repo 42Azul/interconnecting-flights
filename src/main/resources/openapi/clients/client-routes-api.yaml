@@ -5,6 +5,9 @@ info:
 paths:
   /views/locate/3/routes:
     get:
+      operationId: FetchAllRoutes
+      tags:
+        - routes
       summary: Get available Ryanair routes
       responses:
         '200':

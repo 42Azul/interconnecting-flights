@@ -30,3 +30,12 @@ build/
 
 ### VS Code ###
 .vscode/
+
+
+##OpenAPI
+_merged_spec.yaml
+
+
+## Proxy issues and devutils
+settings-local.xml
+/src/main/java/com/ryanair/interconnector/devutils/
