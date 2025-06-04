@@ -6,6 +6,9 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import java.util.List;
 
+/**
+ * Service that acts as a facade for fetching routes from the RoutesClient in a cached manner.
+ */
 @Service
 public class CachedRoutesProvider {
 

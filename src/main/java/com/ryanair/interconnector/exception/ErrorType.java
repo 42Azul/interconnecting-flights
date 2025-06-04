@@ -4,6 +4,10 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.springframework.http.HttpStatus;
 
+/**
+ * Enum representing different error types with associated HTTP status codes, error codes, and messages.
+ * Used to standardize error handling across the application.
+ */
 @Getter
 @AllArgsConstructor
 public enum ErrorType {

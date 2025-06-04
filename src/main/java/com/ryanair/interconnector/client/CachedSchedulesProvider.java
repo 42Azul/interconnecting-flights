@@ -5,6 +5,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
+/**
+ * Service that acts as a facade for the SchedulesClient, providing a cached version of the schedule response.
+ */
 @Service
 public class CachedSchedulesProvider {
 

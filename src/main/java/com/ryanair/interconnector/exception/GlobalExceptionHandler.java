@@ -9,6 +9,11 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import java.util.Optional;
 
+/**
+ * A global exception handler that simplifies controller code, provides consistent error responses, logs issues safely,
+ * and improves maintainability and API caller communication.
+ */
+
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
@@ -32,7 +37,10 @@ public class GlobalExceptionHandler {
 
   @ExceptionHandler(RuntimeException.class)
   public ResponseEntity<Error> handleUnhandledRuntimeException(RuntimeException ex) {
-    log.error("Unhandled exception occurred: {}", ex.getMessage(), ex);
+    log.atError()
+        .setMessage("Unhandled exception occurred: , {}")
+        .addArgument(ex)
+        .log();
 
     // We log it but we do not send it back as we do not want to leak internal issues
     Error apiError = new Error()

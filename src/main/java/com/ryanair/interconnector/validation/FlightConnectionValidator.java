@@ -8,5 +8,11 @@ import com.ryanair.interconnector.dto.FlightSlot;
  */
 public interface FlightConnectionValidator {
 
+  /**
+   * Checks if a connection between two flight slots is valid depending on specific criteria.
+   * @param firstSlot
+   * @param secondSlot
+   * @return true if the connection is valid, false otherwise
+   */
   boolean isValidConnection(FlightSlot firstSlot, FlightSlot secondSlot);
 }

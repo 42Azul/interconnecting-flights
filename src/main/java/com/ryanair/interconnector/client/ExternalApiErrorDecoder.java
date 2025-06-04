@@ -6,6 +6,9 @@ import feign.Response;
 import feign.codec.ErrorDecoder;
 import org.springframework.stereotype.Component;
 
+/**
+ * Custom error decoder for handling errors from external APIs
+ */
 @Component
 public class ExternalApiErrorDecoder implements ErrorDecoder {
 
