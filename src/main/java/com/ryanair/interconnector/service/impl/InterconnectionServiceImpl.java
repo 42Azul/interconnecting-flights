@@ -11,10 +11,12 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 @Slf4j
@@ -23,7 +25,7 @@ public class InterconnectionServiceImpl implements InterconnectionService {
   private final ScheduleQueryService scheduleQueryService;
   private final RouteQueryService routeQueryService;
   private final ConnectionMapper connectionMapper;
-  private final List<FlightConnectionValidator>  flightConnectionValidators;
+  private final List<FlightConnectionValidator> flightConnectionValidators;
 
   @SuppressFBWarnings(
       value = "EI_EXPOSE_REP2",
@@ -43,72 +45,119 @@ public class InterconnectionServiceImpl implements InterconnectionService {
   }
 
   @Override
-  public Flux<Connection> findInterconnections(
+  public CompletableFuture<List<Connection>> findInterconnections(
       String departure,
       String arrival,
       LocalDateTime departureDateTime,
       LocalDateTime arrivalDateTime) {
 
-    return Flux.concat(
-        getSingleLegConnections(departure, arrival, departureDateTime, arrivalDateTime),
-        getMultiLegConnections(departure, arrival, departureDateTime, arrivalDateTime)
-    );
+    CompletableFuture<List<Connection>> singleLegFut = getSingleLegConnections(
+        departure,
+        arrival,
+        departureDateTime,
+        arrivalDateTime);
+
+    CompletableFuture<List<Connection>> multiLegFut = getMultiLegConnections(
+        departure,
+        arrival,
+        departureDateTime,
+        arrivalDateTime);
+
+    // Combine both results preserving the order: direct first, then interconnected
+    return singleLegFut.thenCombine(multiLegFut, (single, multi) -> {
+      List<Connection> combined = new ArrayList<>(single.size() + multi.size());
+      combined.addAll(single);
+      combined.addAll(multi);
+      return combined;
+    });
   }
 
-  private Flux<Connection> getSingleLegConnections(
+  private CompletableFuture<List<Connection>> getSingleLegConnections(
       String departure,
       String arrival,
       LocalDateTime departureDateTime,
       LocalDateTime arrivalDateTime) {
     return routeQueryService.existsDirectRoute(departure, arrival)
-        .doOnNext((valid) -> log.atInfo().setMessage("Single leg connections from {} to {} are {}")
-            .addArgument(departure)
-            .addArgument(arrival)
-            .addArgument(valid ? "EXISTING" : "NOT EXISTING")
-            .log())
-        .flatMapMany(valid ->
+        .thenApply(valid -> {
+              log.atInfo().setMessage("Single leg connections from {} to {} are {}")
+                  .addArgument(departure)
+                  .addArgument(arrival)
+                  .addArgument(valid ? "EXISTING" : "NOT EXISTING")
+                  .log();
+              return valid;
+            }
+        )
+        .thenCompose(valid ->
             valid
                 ? scheduleQueryService.findFlightSlots(departure, arrival, departureDateTime, arrivalDateTime)
-                : Flux.empty())
-        .flatMap(slot -> Mono.justOrEmpty(connectionMapper.toSingleLegConnection(departure, arrival, slot)));
+                : CompletableFuture.completedFuture(Collections.emptyList()))
+        .thenApply(slots ->
+            slots.stream()
+                .map(slot -> connectionMapper.toSingleLegConnection(departure, arrival, slot))
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .toList());
   }
 
-  private Flux<Connection> getMultiLegConnections(
+  private CompletableFuture<List<Connection>> getMultiLegConnections(
       String departure,
       String arrival,
       LocalDateTime minimumDepartureTime,
       LocalDateTime maximumArrivalTime) {
 
     return routeQueryService.intermediateAirports(departure, arrival)
-        .doOnNext(set -> log.atInfo().setMessage("Finding multi-leg connections from {} to {} with common airports: {}")
-            .addArgument(departure)
-            .addArgument(arrival)
-            .addArgument(set.size())
-            .log())
-        .flatMapMany(Flux::fromIterable)
-        .flatMap(intermediate ->
-            buildConnectionsVia(departure, intermediate, arrival, minimumDepartureTime, maximumArrivalTime));
+        .thenApply(set -> {
+          log.atInfo().setMessage("Finding multi-leg connections from {} to {} with common airports: {}")
+              .addArgument(departure)
+              .addArgument(arrival)
+              .addArgument(set.size())
+              .log();
+          return set;
+        })
+        .thenCompose(set -> {
+          List<CompletableFuture<List<Connection>>> futures = set.stream()
+              .map(intermediate -> buildConnectionsVia(departure, intermediate, arrival, minimumDepartureTime,
+                  maximumArrivalTime))
+              .toList();
+
+          return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+              .thenApply(v -> futures.stream()
+                  .flatMap(f -> f.join().stream())
+                  .toList());
+        });
   }
 
-  private Flux<Connection> buildConnectionsVia(
+  private CompletableFuture<List<Connection>> buildConnectionsVia(
       String departure,
       String intermediate,
       String arrival,
       LocalDateTime minimumDepartureTime,
       LocalDateTime maximumArrivalTime) {
 
-    return Mono.zip(
-            scheduleQueryService.findFlightSlots(departure, intermediate, minimumDepartureTime, maximumArrivalTime).collectList(),
-            scheduleQueryService.findFlightSlots(intermediate, arrival,  minimumDepartureTime, maximumArrivalTime).collectList())
-        .flatMapMany(firstAndSecondSlots -> Flux.fromIterable(firstAndSecondSlots.getT1())
-            .flatMap(firstSlot -> Flux.fromIterable(firstAndSecondSlots.getT2())
-                .filter(secondSlot -> isValidConnection(firstSlot, secondSlot))
-                .flatMap(secondSlot -> Mono.justOrEmpty(connectionMapper.toMultiLegConnection(departure, intermediate, arrival, firstSlot, secondSlot)))));
+    CompletableFuture<List<FlightSlot>> firstLegFut = scheduleQueryService.findFlightSlots(
+        departure, intermediate, minimumDepartureTime, maximumArrivalTime);
+
+    CompletableFuture<List<FlightSlot>> secondLegFut = scheduleQueryService.findFlightSlots(
+        intermediate, arrival, minimumDepartureTime, maximumArrivalTime);
+
+    return firstLegFut.thenCombine(secondLegFut, (firstSlots, secondSlots) -> {
+      List<Connection> connections = new ArrayList<>();
+      for (FlightSlot firstSlot : firstSlots) {
+        for (FlightSlot secondSlot : secondSlots) {
+          if (isValidConnection(firstSlot, secondSlot)) {
+            connectionMapper.toMultiLegConnection(
+                    departure, intermediate, arrival, firstSlot, secondSlot)
+                .ifPresent(connections::add);
+          }
+        }
+      }
+      return connections;
+    });
   }
 
-
   private boolean isValidConnection(FlightSlot firstSlot, FlightSlot secondSlot) {
-    return flightConnectionValidators.stream().allMatch(validator -> validator.isValidConnection(firstSlot, secondSlot));
+    return flightConnectionValidators.stream()
+        .allMatch(validator -> validator.isValidConnection(firstSlot, secondSlot));
   }
 }
 

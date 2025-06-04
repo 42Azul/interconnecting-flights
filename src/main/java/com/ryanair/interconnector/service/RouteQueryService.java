@@ -1,10 +1,10 @@
 package com.ryanair.interconnector.service;
 
-import reactor.core.publisher.Mono;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 
 public interface RouteQueryService {
 
-    Mono<Set<String>> intermediateAirports(String from, String to);
-    Mono<Boolean> existsDirectRoute(String from, String to);
+    CompletableFuture<Set<String>> intermediateAirports(String from, String to);
+    CompletableFuture<Boolean> existsDirectRoute(String from, String to);
 }

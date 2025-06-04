@@ -1,10 +1,11 @@
 package com.ryanair.interconnector.service;
 
 import com.ryanair.interconnector.dto.FlightSlot;
-import reactor.core.publisher.Flux;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 public interface ScheduleQueryService {
 
-    Flux<FlightSlot> findFlightSlots(String from, String to, LocalDateTime start, LocalDateTime end);
+    CompletableFuture<List<FlightSlot>> findFlightSlots(String from, String to, LocalDateTime start, LocalDateTime end);
 }

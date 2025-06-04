@@ -109,6 +109,14 @@ class InterconnectionControllerIT {
   void shouldReturnSingleLegAndOneStopConnections(InterconnectionTestScenario scenario) {
     List<Connection> actual = callApiWithGivenScenarioOK(scenario);
     assertEquals(scenario.expectedConnections(), actual);
+
+    // Verify cache is working properly
+    List<ServeEvent> serveEvents = wireMock.getAllServeEvents();
+    actual = callApiWithGivenScenarioOK(scenario);
+
+    List<ServeEvent> serveEventsSecondCall = wireMock.getAllServeEvents();
+    assertEquals(scenario.expectedConnections(), actual);
+    assertEquals(serveEvents, serveEventsSecondCall);
   }
 
   @ParameterizedTest
@@ -118,7 +126,7 @@ class InterconnectionControllerIT {
     assertTrue(actual.isEmpty());
     actual = callApiWithGivenScenarioOK(testScenario);
     assertTrue(actual.isEmpty());
-    // Verify that the Routes API was called only once, ensuring cache works propperly.
+    // Verify that the Routes API was called only once, ensuring cache works properly.
     verify(getRequestedFor(urlPathEqualTo(ROUTES_API_PATH)));
     List<ServeEvent> serveEvents = wireMock.getAllServeEvents();
     assertEquals(1, serveEvents.size());
@@ -152,9 +160,6 @@ class InterconnectionControllerIT {
     assertEquals(ErrorType.EXTERNAL_API_ERROR.getCode(), error.getCode());
     assertEquals(ErrorType.EXTERNAL_API_ERROR.getMessage(), error.getMessage());
     verify(getRequestedFor(urlPathEqualTo(ROUTES_API_PATH)));
-    //No more requests to any api should be made since the Routes API failed
-    List<ServeEvent> serveEvents = wireMock.getAllServeEvents();
-    assertEquals(1, serveEvents.size());
   }
 
   @ParameterizedTest

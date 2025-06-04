@@ -1,10 +1,14 @@
 package com.ryanair.interconnector.service.impl;
 
-import static org.mockito.Mockito.mock;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
 import com.ryanair.interconnectingflights.external.model.Route;
+import com.ryanair.interconnector.client.CachedRoutesProvider;
 import com.ryanair.interconnector.client.RoutesClient;
+import com.ryanair.interconnector.testutils.DirectExecutor;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -13,12 +17,14 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
-import reactor.test.StepVerifier;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
 @ExtendWith(MockitoExtension.class)
@@ -33,7 +39,11 @@ class RouteQueryServiceImplTest {
   private static final String DESTINATION_AIRPORT_LOWER = "Stn";
 
   @Mock
-  RoutesClient routesClient;
+  CachedRoutesProvider routesProvider;
+
+  // Using direct execution for the unit tests, as we do not want async checks here
+  @Spy
+  Executor directExecutor = new DirectExecutor();
 
   @InjectMocks
   RouteQueryServiceImpl service;
@@ -52,62 +62,55 @@ class RouteQueryServiceImplTest {
         ORIGIN_AIRPORT + ", " + DESTINATION_AIRPORT_LOWER,
         ORIGIN_AIRPORT_LOWER + ", " + DESTINATION_AIRPORT
     })
-    void shouldReturnTrueWhenValidRouteExists(String originAirport, String destinationAirport) {
+    void shouldReturnTrueWhenValidRouteExists(String originAirport, String destinationAirport)
+        throws ExecutionException, InterruptedException {
       // Arrange
-      when(routesClient.fetchAllRoutesAsync()).thenReturn(Mono.just(List.of(validRoute, invalidRoute)));
+      when(routesProvider.fetchAllRoutesCached()).thenReturn(List.of(validRoute, invalidRoute));
 
       // Act
-      Mono<Boolean> result = service.existsDirectRoute(originAirport, destinationAirport);
+      CompletableFuture<Boolean> result = service.existsDirectRoute(originAirport, destinationAirport);
 
       // Assert
-      StepVerifier.create(result)
-          .expectNext(true)
-          .verifyComplete();
+      assertTrue(result.get());
     }
 
 
     @Test
-    void shouldReturnFalseIfNoMatchingRouteExistsWithValidOperator() {
+    void shouldReturnFalseIfNoMatchingRouteExistsWithValidOperator() throws ExecutionException, InterruptedException {
       // Arrange
-      when(routesClient.fetchAllRoutesAsync()).thenReturn(Mono.just(List.of(invalidRoute)));
+      when(routesProvider.fetchAllRoutesCached()).thenReturn(List.of(invalidRoute));
 
       // Act
-      Mono<Boolean> result = service.existsDirectRoute(ORIGIN_AIRPORT, DESTINATION_AIRPORT);
+      CompletableFuture<Boolean> result = service.existsDirectRoute(ORIGIN_AIRPORT, DESTINATION_AIRPORT);
 
       // Assert
-      StepVerifier.create(result)
-          .expectNext(false)
-          .verifyComplete();
+      assertFalse(result.get());
     }
 
     @Test
-    void shouldReturnFalseIfNoRoutesExist() {
+    void shouldReturnFalseIfNoRoutesExist() throws ExecutionException, InterruptedException {
       // Arrange
-      when(routesClient.fetchAllRoutesAsync()).thenReturn(Mono.empty());
+      when(routesProvider.fetchAllRoutesCached()).thenReturn(List.of());
 
       // Act
-      Mono<Boolean> result = service.existsDirectRoute(ORIGIN_AIRPORT, DESTINATION_AIRPORT);
+      CompletableFuture<Boolean> result = service.existsDirectRoute(ORIGIN_AIRPORT, DESTINATION_AIRPORT);
 
       // Assert
-      StepVerifier.create(result)
-          .expectNext(false)
-          .verifyComplete();
+      assertFalse(result.get());
     }
 
     @Test
-    void shouldReturnFalseIfAllRoutesAreDifferent() {
+    void shouldReturnFalseIfAllRoutesAreDifferent() throws ExecutionException, InterruptedException {
       // Arrange
       Route differentRoute = new Route().airportFrom(ORIGIN_AIRPORT).airportTo("ABC").operator(VALID_OPERATOR);
       Route anotherDifferentRoute = new Route().airportFrom("LMN").airportTo(DESTINATION_AIRPORT).operator(VALID_OPERATOR);
-      when(routesClient.fetchAllRoutesAsync()).thenReturn(Mono.just(List.of(differentRoute, anotherDifferentRoute)));
+      when(routesProvider.fetchAllRoutesCached()).thenReturn(List.of(differentRoute, anotherDifferentRoute));
 
       // Act
-      Mono<Boolean> result = service.existsDirectRoute(ORIGIN_AIRPORT, DESTINATION_AIRPORT);
+      CompletableFuture<Boolean> result = service.existsDirectRoute(ORIGIN_AIRPORT, DESTINATION_AIRPORT);
 
       // Assert
-      StepVerifier.create(result)
-          .expectNext(false)
-          .verifyComplete();
+      assertFalse(result.get());
     }
   }
 
@@ -143,50 +146,49 @@ class RouteQueryServiceImplTest {
 
     @ParameterizedTest
     @MethodSource("provideDifferentOrderings")
-    void shouldReturnIntersectionRegardlessOfFluxOrder(List<Route> routesInAnyOrder) {
+    void shouldReturnIntersectionRegardlessOfOrder(List<Route> routesInAnyOrder)
+        throws ExecutionException, InterruptedException {
       // Arrange
-      when(routesClient.fetchAllRoutesAsync())
-          .thenReturn(Mono.just(routesInAnyOrder));
+      when(routesProvider.fetchAllRoutesCached())
+          .thenReturn(routesInAnyOrder);
 
       Set<String> expected = Set.of(INTERMEDIATE_AIRPORT_1, INTERMEDIATE_AIRPORT_2);
 
       // Act
-      Mono<Set<String>> result = service.intermediateAirports(ORIGIN_AIRPORT, DESTINATION_AIRPORT);
+      CompletableFuture<Set<String>> result = service.intermediateAirports(ORIGIN_AIRPORT, DESTINATION_AIRPORT);
 
       // Assert
-      StepVerifier.create(result)
-          .expectNextMatches(actualSet -> actualSet.equals(expected))
-          .verifyComplete();
+      Set<String> resultSet = result.get();
+      assertEquals(expected, resultSet);
     }
 
     @Test
-    void shouldReturnIntersectionCaseInsensitive() {
+    void shouldReturnIntersectionCaseInsensitive() throws ExecutionException, InterruptedException {
       // Arrange
-      when(routesClient.fetchAllRoutesAsync())
-          .thenReturn(Mono.just(List.of(FROM_ROUTE_1, TO_ROUTE_1)));
+      when(routesProvider.fetchAllRoutesCached())
+          .thenReturn(List.of(FROM_ROUTE_1, TO_ROUTE_1));
 
       // Act
-      Mono<Set<String>> result = service.intermediateAirports(ORIGIN_AIRPORT_LOWER, DESTINATION_AIRPORT_LOWER);
+      CompletableFuture<Set<String>> result = service.intermediateAirports(ORIGIN_AIRPORT_LOWER, DESTINATION_AIRPORT_LOWER);
 
       // Assert
-      StepVerifier.create(result)
-          .expectNextMatches(set -> set.contains(INTERMEDIATE_AIRPORT_1) && set.size() == 1)
-          .verifyComplete();
+      Set<String> resultSet = result.get();
+      assertEquals(1, resultSet.size());
+      assertTrue(resultSet.contains(INTERMEDIATE_AIRPORT_1));
     }
 
     @Test
-    void shouldReturnEmptyIfNoIntersection() {
+    void shouldReturnEmptyIfNoIntersection() throws ExecutionException, InterruptedException {
       // Arrange
-      when(routesClient.fetchAllRoutesAsync())
-          .thenReturn(Mono.just(List.of(FROM_ROUTE_1, TO_ROUTE_2)));
+      when(routesProvider.fetchAllRoutesCached())
+          .thenReturn(List.of(FROM_ROUTE_1, TO_ROUTE_2));
 
       // Act
-      Mono<Set<String>> result = service.intermediateAirports(ORIGIN_AIRPORT, DESTINATION_AIRPORT);
+      CompletableFuture<Set<String>> result = service.intermediateAirports(ORIGIN_AIRPORT, DESTINATION_AIRPORT);
 
       // Assert
-      StepVerifier.create(result)
-          .expectNextMatches(Set::isEmpty)
-          .verifyComplete();
+      Set<String> resultSet = result.get();
+      assertTrue(resultSet.isEmpty());
     }
 
     @ParameterizedTest
@@ -197,20 +199,20 @@ class RouteQueryServiceImplTest {
             INVALID_OPERATOR + ", " + INVALID_OPERATOR
         }
     )
-    void shouldIgnoresInvalidOperatorRoutes(String operatorFirstFlight, String operatorSecondFlight) {
+    void shouldIgnoresInvalidOperatorRoutes(String operatorFirstFlight, String operatorSecondFlight)
+        throws ExecutionException, InterruptedException {
       // Arrange
       Route wrongOperator1 = new Route().airportFrom(ORIGIN_AIRPORT).airportTo(INTERMEDIATE_AIRPORT_1).operator(operatorFirstFlight);
       Route wrongOperator2 = new Route().airportFrom(INTERMEDIATE_AIRPORT_1).airportTo(DESTINATION_AIRPORT).operator(operatorSecondFlight);
 
-      when(routesClient.fetchAllRoutesAsync()).thenReturn(Mono.just(List.of(wrongOperator1, wrongOperator2)));
+      when(routesProvider.fetchAllRoutesCached()).thenReturn(List.of(wrongOperator1, wrongOperator2));
 
       // Act
-      Mono<Set<String>> result = service.intermediateAirports(ORIGIN_AIRPORT, DESTINATION_AIRPORT);
+      CompletableFuture<Set<String>> result = service.intermediateAirports(ORIGIN_AIRPORT, DESTINATION_AIRPORT);
 
       // Assert
-      StepVerifier.create(result)
-          .expectNextMatches(Set::isEmpty)
-          .verifyComplete();
+      Set<String> resultSet = result.get();
+      assertTrue(resultSet.isEmpty());
     }
   }
 }

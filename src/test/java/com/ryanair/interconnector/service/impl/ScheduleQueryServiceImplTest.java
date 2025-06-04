@@ -1,27 +1,31 @@
 package com.ryanair.interconnector.service.impl;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.ryanair.interconnectingflights.external.model.ScheduleResponse;
-import com.ryanair.interconnector.client.SchedulesClient;
+import com.ryanair.interconnector.client.CachedSchedulesProvider;
 import com.ryanair.interconnector.dto.FlightSlot;
 import com.ryanair.interconnector.mapping.ScheduleMapper;
+import com.ryanair.interconnector.testutils.DirectExecutor;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
-import reactor.test.StepVerifier;
-
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 
 @ExtendWith(MockitoExtension.class)
 class ScheduleQueryServiceImplTest {
@@ -37,21 +41,24 @@ class ScheduleQueryServiceImplTest {
   private static final LocalDateTime RANGE_END = BASE.plusDays(10).withHour(18);
 
   @Mock
-  SchedulesClient client;
+  ScheduleMapper mapper;
 
   @Mock
-  ScheduleMapper mapper;
+  CachedSchedulesProvider schedulesProvider;
+
+  // Using direct execution for the unit tests, as we do not want async checks here
+  @Spy
+  Executor directExecutor = new DirectExecutor();
 
   @InjectMocks
   ScheduleQueryServiceImpl service;
 
   private void stubMonth(YearMonth ym, FlightSlot... slots) {
     ScheduleResponse resp = mock(ScheduleResponse.class);
-    if(slots.length == 0) {
-      when(client.getScheduleAsync(FROM, TO, ym.getYear(), ym.getMonthValue()))
-          .thenReturn(Mono.empty());
+    if (slots.length == 0) {
+      when(schedulesProvider.getScheduleCached(FROM, TO, ym.getYear(), ym.getMonthValue())).thenReturn(null);
     } else {
-      when(client.getScheduleAsync(FROM, TO, ym.getYear(), ym.getMonthValue())).thenReturn(Mono.just(resp));
+      when(schedulesProvider.getScheduleCached(FROM, TO, ym.getYear(), ym.getMonthValue())).thenReturn(resp);
       when(mapper.toFlightSlots(ym.getYear(), resp)).thenReturn(List.of(slots));
     }
   }
@@ -60,25 +67,27 @@ class ScheduleQueryServiceImplTest {
   class SingleMonth {
 
     @Test
-    void shouldReturnOnlyInRangeSlots() {
+    void shouldReturnOnlyInRangeSlots() throws ExecutionException, InterruptedException {
       // Arrange
       FlightSlot valid = new FlightSlot(RANGE_START.plusDays(2), RANGE_END.minusDays(2));
       FlightSlot out = new FlightSlot(RANGE_START.minusDays(2), RANGE_END.minusDays(10));
       stubMonth(JAN, valid, out);
 
       // Act
-      Flux<FlightSlot> result = service.findFlightSlots(FROM, TO, RANGE_START, RANGE_END);
+      CompletableFuture<List<FlightSlot>> result = service.findFlightSlots(FROM, TO, RANGE_START, RANGE_END);
 
       // Assert
-      StepVerifier.create(result).expectNext(valid).verifyComplete();
+      List<FlightSlot> resultList = result.get();
+      assertEquals(1, resultList.size());
+      assertEquals(valid, resultList.get(0));
 
       // Verify interactions
-      verify(client).getScheduleAsync(FROM, TO, JAN.getYear(), JAN.getMonthValue());
-      verifyNoMoreInteractions(client);
+      verify(schedulesProvider).getScheduleCached(FROM, TO, JAN.getYear(), JAN.getMonthValue());
+      verifyNoMoreInteractions(schedulesProvider);
     }
 
     @Test
-    void shouldExcludeBoundarySlots() {
+    void shouldExcludeBoundarySlots() throws ExecutionException, InterruptedException {
       // Arrange
       FlightSlot atStart = new FlightSlot(RANGE_START, RANGE_START.plusHours(2));
       FlightSlot atEnd = new FlightSlot(RANGE_END.minusHours(2), RANGE_END);
@@ -86,27 +95,33 @@ class ScheduleQueryServiceImplTest {
       stubMonth(JAN, atStart, atEnd, inRange);
 
       // Act
-      Flux<FlightSlot> result = service.findFlightSlots(FROM, TO, RANGE_START, RANGE_END);
+      CompletableFuture<List<FlightSlot>> result = service.findFlightSlots(FROM, TO, RANGE_START, RANGE_END);
 
       // Assert
-      StepVerifier.create(result).expectNext(inRange).verifyComplete();
+      List<FlightSlot> resultList = result.get();
+      assertEquals(1, resultList.size());
+      assertEquals(inRange, resultList.get(0));
 
       // Verify interactions
-      verify(client).getScheduleAsync(FROM, TO, JAN.getYear(), JAN.getMonthValue());
-      verifyNoMoreInteractions(client);
+      verify(schedulesProvider).getScheduleCached(FROM, TO, JAN.getYear(), JAN.getMonthValue());
+      verifyNoMoreInteractions(schedulesProvider);
     }
 
     @Test
-    void shouldReturnEmptyWhenNoSlots() {
+    void shouldReturnEmptyWhenNoSlots() throws ExecutionException, InterruptedException {
       // Arrange
       stubMonth(JAN);
 
-      // Act & Assert
-      StepVerifier.create(service.findFlightSlots(FROM, TO, RANGE_START, RANGE_END)).verifyComplete();
+      // Act
+      CompletableFuture<List<FlightSlot>> result = service.findFlightSlots(FROM, TO, RANGE_START, RANGE_END);
+
+      // Assert
+      List<FlightSlot> resultList = result.get();
+      assertTrue(resultList.isEmpty());
 
       // Verify interactions
-      verify(client).getScheduleAsync(FROM, TO, JAN.getYear(), JAN.getMonthValue());
-      verifyNoMoreInteractions(client);
+      verify(schedulesProvider).getScheduleCached(FROM, TO, JAN.getYear(), JAN.getMonthValue());
+      verifyNoMoreInteractions(schedulesProvider);
     }
   }
 
@@ -114,7 +129,7 @@ class ScheduleQueryServiceImplTest {
   class MultiMonth {
 
     @Test
-    void shouldAggregateAcrossMonths() {
+    void shouldAggregateAcrossMonths() throws ExecutionException, InterruptedException {
       // Arrange
       LocalDateTime midFebruary = FEB.atDay(15).atTime(12, 0);
       FlightSlot january = new FlightSlot(RANGE_START.plusDays(5), RANGE_START.plusDays(5).plusHours(2));
@@ -124,19 +139,22 @@ class ScheduleQueryServiceImplTest {
       stubMonth(FEB, februaryValid, februaryInvalid);
 
       // Act
-      Flux<FlightSlot> result = service.findFlightSlots(FROM, TO, RANGE_START, midFebruary);
+      CompletableFuture<List<FlightSlot>> result = service.findFlightSlots(FROM, TO, RANGE_START, midFebruary);
 
       // Assert
-      StepVerifier.create(result).expectNext(january, februaryValid).verifyComplete();
+      List<FlightSlot> resultList = result.get();
+      assertEquals(2, resultList.size());
+      assertTrue(resultList.contains(january));
+      assertTrue(resultList.contains(februaryValid));
 
       // Verify interactions so for example march is not called as it is out of range
-      verify(client).getScheduleAsync(FROM, TO, JAN.getYear(), JAN.getMonthValue());
-      verify(client).getScheduleAsync(FROM, TO, FEB.getYear(), FEB.getMonthValue());
-      verifyNoMoreInteractions(client);
+      verify(schedulesProvider).getScheduleCached(FROM, TO, JAN.getYear(), JAN.getMonthValue());
+      verify(schedulesProvider).getScheduleCached(FROM, TO, FEB.getYear(), FEB.getMonthValue());
+      verifyNoMoreInteractions(schedulesProvider);
     }
 
     @Test
-    void shouldHandleDifferentYears(){
+    void shouldHandleDifferentYears() throws ExecutionException, InterruptedException {
       // Arrange
       LocalDateTime start = DEC.atDay(20).atTime(10, 0);
       LocalDateTime end = JAN.atDay(6).atTime(18, 0);
@@ -149,15 +167,17 @@ class ScheduleQueryServiceImplTest {
       stubMonth(JAN, janValid, janInvalid);
 
       // Act
-      Flux<FlightSlot> result = service.findFlightSlots(FROM, TO, start, end);
+      CompletableFuture<List<FlightSlot>> result = service.findFlightSlots(FROM, TO, start, end);
 
       // Assert
-      StepVerifier.create(result).expectNext(decValid, janValid).verifyComplete();
+      List<FlightSlot> resultList = result.get();
+      assertEquals(2, resultList.size());
+      assertTrue(resultList.contains(decValid));
 
       // Verify interactions
-      verify(client).getScheduleAsync(FROM, TO, DEC.getYear(), DEC.getMonthValue());
-      verify(client).getScheduleAsync(FROM, TO, JAN.getYear(), JAN.getMonthValue());
-      verifyNoMoreInteractions(client);
+      verify(schedulesProvider).getScheduleCached(FROM, TO, DEC.getYear(), DEC.getMonthValue());
+      verify(schedulesProvider).getScheduleCached(FROM, TO, JAN.getYear(), JAN.getMonthValue());
+      verifyNoMoreInteractions(schedulesProvider);
     }
   }
 }
