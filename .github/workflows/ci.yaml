@@ -47,9 +47,9 @@ jobs:
 
   # Comment coverage in the Pull Request after generating badges
   coverage:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     needs: build-test
-
     steps:
       - name: Download JaCoCo report
         uses: actions/download-artifact@v4
