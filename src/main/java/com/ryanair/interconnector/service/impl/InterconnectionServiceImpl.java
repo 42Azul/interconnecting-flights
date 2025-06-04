@@ -18,6 +18,13 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
+/**
+ * Implementation of the InterconnectionService that provides methods to find interconnections
+ * It uses ScheduleQueryService to find flight slots and RouteQueryService to check routes and combine them
+ * into connections.
+ * It supports both single-leg and multi-leg connections, validating each connection using a list of validators that are
+ * injected into the service by the framework, enabling custom validation logic for flight connections.
+ */
 @Service
 @Slf4j
 public class InterconnectionServiceImpl implements InterconnectionService {

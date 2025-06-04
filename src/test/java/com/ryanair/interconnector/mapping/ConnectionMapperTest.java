@@ -1,5 +1,8 @@
 package com.ryanair.interconnector.mapping;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.ryanair.interconnectingflights.model.Connection;
 import com.ryanair.interconnectingflights.model.Leg;
 import com.ryanair.interconnector.dto.FlightSlot;
@@ -7,12 +10,9 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 class ConnectionMapperTest {
 

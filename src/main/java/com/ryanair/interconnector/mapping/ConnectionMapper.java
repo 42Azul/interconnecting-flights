@@ -4,10 +4,8 @@ import com.ryanair.interconnectingflights.model.Connection;
 import com.ryanair.interconnectingflights.model.Leg;
 import com.ryanair.interconnector.dto.FlightSlot;
 import org.springframework.stereotype.Component;
-
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Stream;
 
 @Component
 public class ConnectionMapper {

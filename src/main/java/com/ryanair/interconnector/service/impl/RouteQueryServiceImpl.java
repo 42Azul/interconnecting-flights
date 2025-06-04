@@ -11,6 +11,12 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
+/**
+ * Service implementation for querying flight routes.
+ * This implementation filter routes by the operator "RYANAIR" and uses cached routes for performance as well as custom executor
+ * for the asynchronous operations.
+ */
+
 @Service
 public class RouteQueryServiceImpl implements RouteQueryService {
 

@@ -15,6 +15,13 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.stream.Stream;
 
+/**
+ * Implementation of the ScheduleQueryService that retrieves flight slots
+ * for a given route and time range.
+ * This service uses a cached provider to fetch schedules to provide a better performance and
+ * an executor to handle asynchronous operations in a better way.
+ */
+
 @Service
 public class ScheduleQueryServiceImpl implements ScheduleQueryService {
 

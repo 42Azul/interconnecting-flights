@@ -7,7 +7,6 @@ import static org.mockito.Mockito.when;
 
 import com.ryanair.interconnectingflights.external.model.Route;
 import com.ryanair.interconnector.client.CachedRoutesProvider;
-import com.ryanair.interconnector.client.RoutesClient;
 import com.ryanair.interconnector.testutils.DirectExecutor;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -24,7 +23,6 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
 @ExtendWith(MockitoExtension.class)
