@@ -29,7 +29,6 @@ components:
           type: string
         connectingAirport:
           type: string
-          nullable: true
         newRoute:
           type: boolean
         seasonalRoute:

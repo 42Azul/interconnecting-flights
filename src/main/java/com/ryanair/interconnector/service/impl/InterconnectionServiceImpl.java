@@ -6,7 +6,7 @@ import com.ryanair.interconnector.mapping.ConnectionMapper;
 import com.ryanair.interconnector.service.InterconnectionService;
 import com.ryanair.interconnector.service.RouteQueryService;
 import com.ryanair.interconnector.service.ScheduleQueryService;
-import com.ryanair.interconnector.validation.FlightConnectionValidator;
+import com.ryanair.interconnector.validation.connection.FlightConnectionValidator;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;

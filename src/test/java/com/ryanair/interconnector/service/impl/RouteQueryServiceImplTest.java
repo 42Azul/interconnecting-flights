@@ -3,11 +3,15 @@ package com.ryanair.interconnector.service.impl;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import com.ryanair.interconnectingflights.external.model.Route;
 import com.ryanair.interconnector.client.CachedRoutesProvider;
 import com.ryanair.interconnector.testutils.DirectExecutor;
+import com.ryanair.interconnector.validation.route.RouteValidator;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,6 +22,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -28,8 +33,7 @@ import java.util.stream.Stream;
 @ExtendWith(MockitoExtension.class)
 class RouteQueryServiceImplTest {
 
-  private static final String VALID_OPERATOR = "RYANAIR";
-  private static final String INVALID_OPERATOR = "INVALID";
+  private static final String OPERATOR = "RYANAIR";
 
   private static final String ORIGIN_AIRPORT = "DUB";
   private static final String DESTINATION_AIRPORT = "STN";
@@ -42,16 +46,28 @@ class RouteQueryServiceImplTest {
   // Using direct execution for the unit tests, as we do not want async checks here
   @Spy
   Executor directExecutor = new DirectExecutor();
+  @Mock
+  RouteValidator routeValidator;
+  @Spy
+  List<RouteValidator> validatorList = new ArrayList<>();
 
   @InjectMocks
   RouteQueryServiceImpl service;
 
   private final Route validRoute = new Route().airportFrom(ORIGIN_AIRPORT).airportTo(DESTINATION_AIRPORT).operator(
-      VALID_OPERATOR);
-  private final Route invalidRoute = new Route().airportFrom(ORIGIN_AIRPORT).airportTo(DESTINATION_AIRPORT).operator(INVALID_OPERATOR);
+      OPERATOR);
+
+  private final Route invalidRoute = new Route().airportFrom(ORIGIN_AIRPORT).airportTo(DESTINATION_AIRPORT).operator(
+      "INVALID_OPERATOR");
 
   @Nested
   class ExistsValidRoute {
+
+    @BeforeEach
+    void setUp() {
+      validatorList.clear();
+      validatorList.add(routeValidator);
+    }
 
     @ParameterizedTest
     @CsvSource({
@@ -63,7 +79,9 @@ class RouteQueryServiceImplTest {
     void shouldReturnTrueWhenValidRouteExists(String originAirport, String destinationAirport)
         throws ExecutionException, InterruptedException {
       // Arrange
-      when(routesProvider.fetchAllRoutesCached()).thenReturn(List.of(validRoute, invalidRoute));
+      when(routesProvider.fetchAllRoutesCached()).thenReturn(List.of(invalidRoute, validRoute));
+      when(routeValidator.isValidRoute(validRoute)).thenReturn(true);
+      lenient().when(routeValidator.isValidRoute(invalidRoute)).thenReturn(false);
 
       // Act
       CompletableFuture<Boolean> result = service.existsDirectRoute(originAirport, destinationAirport);
@@ -74,9 +92,10 @@ class RouteQueryServiceImplTest {
 
 
     @Test
-    void shouldReturnFalseIfNoMatchingRouteExistsWithValidOperator() throws ExecutionException, InterruptedException {
+    void shouldReturnFalseIfNoMatchingRouteIsValid() throws ExecutionException, InterruptedException {
       // Arrange
       when(routesProvider.fetchAllRoutesCached()).thenReturn(List.of(invalidRoute));
+      when(routeValidator.isValidRoute(invalidRoute)).thenReturn(false);
 
       // Act
       CompletableFuture<Boolean> result = service.existsDirectRoute(ORIGIN_AIRPORT, DESTINATION_AIRPORT);
@@ -100,8 +119,8 @@ class RouteQueryServiceImplTest {
     @Test
     void shouldReturnFalseIfAllRoutesAreDifferent() throws ExecutionException, InterruptedException {
       // Arrange
-      Route differentRoute = new Route().airportFrom(ORIGIN_AIRPORT).airportTo("ABC").operator(VALID_OPERATOR);
-      Route anotherDifferentRoute = new Route().airportFrom("LMN").airportTo(DESTINATION_AIRPORT).operator(VALID_OPERATOR);
+      Route differentRoute = new Route().airportFrom(ORIGIN_AIRPORT).airportTo("ABC").operator(OPERATOR);
+      Route anotherDifferentRoute = new Route().airportFrom("LMN").airportTo(DESTINATION_AIRPORT).operator(OPERATOR);
       when(routesProvider.fetchAllRoutesCached()).thenReturn(List.of(differentRoute, anotherDifferentRoute));
 
       // Act
@@ -119,15 +138,20 @@ class RouteQueryServiceImplTest {
     private static final String INTERMEDIATE_AIRPORT_2 = "BGY";
 
     private static final Route FROM_ROUTE_1 = new Route().airportFrom(ORIGIN_AIRPORT).airportTo(INTERMEDIATE_AIRPORT_1).operator(
-        VALID_OPERATOR);
+        OPERATOR);
     private static final Route FROM_ROUTE_2 = new Route().airportFrom(ORIGIN_AIRPORT).airportTo(INTERMEDIATE_AIRPORT_2).operator(
-        VALID_OPERATOR);
+        OPERATOR);
     private static final Route TO_ROUTE_1 = new Route().airportFrom(INTERMEDIATE_AIRPORT_1).airportTo(DESTINATION_AIRPORT).operator(
-        VALID_OPERATOR);
+        OPERATOR);
     private static final Route TO_ROUTE_2 = new Route().airportFrom(INTERMEDIATE_AIRPORT_2).airportTo(DESTINATION_AIRPORT).operator(
-        VALID_OPERATOR);
+        OPERATOR);
 
 
+    @BeforeEach
+    void setUp() {
+      validatorList.clear();
+      validatorList.add(routeValidator);
+    }
 
     /**
      * Provides various permutations of [FROM_ROUTE_1, FROM_ROUTE_2, TO_ROUTE_1, TO_ROUTE_2] to ensure the method works
@@ -149,6 +173,7 @@ class RouteQueryServiceImplTest {
       // Arrange
       when(routesProvider.fetchAllRoutesCached())
           .thenReturn(routesInAnyOrder);
+      when(routeValidator.isValidRoute(any())).thenReturn(true);
 
       Set<String> expected = Set.of(INTERMEDIATE_AIRPORT_1, INTERMEDIATE_AIRPORT_2);
 
@@ -165,6 +190,7 @@ class RouteQueryServiceImplTest {
       // Arrange
       when(routesProvider.fetchAllRoutesCached())
           .thenReturn(List.of(FROM_ROUTE_1, TO_ROUTE_1));
+      when(routeValidator.isValidRoute(any())).thenReturn(true);
 
       // Act
       CompletableFuture<Set<String>> result = service.intermediateAirports(ORIGIN_AIRPORT_LOWER, DESTINATION_AIRPORT_LOWER);
@@ -180,6 +206,7 @@ class RouteQueryServiceImplTest {
       // Arrange
       when(routesProvider.fetchAllRoutesCached())
           .thenReturn(List.of(FROM_ROUTE_1, TO_ROUTE_2));
+      when(routeValidator.isValidRoute(any())).thenReturn(true);
 
       // Act
       CompletableFuture<Set<String>> result = service.intermediateAirports(ORIGIN_AIRPORT, DESTINATION_AIRPORT);
@@ -190,18 +217,19 @@ class RouteQueryServiceImplTest {
     }
 
     @ParameterizedTest
-    @CsvSource(
-        value = {
-            VALID_OPERATOR + ", " + INVALID_OPERATOR,
-            INVALID_OPERATOR + ", " + VALID_OPERATOR,
-            INVALID_OPERATOR + ", " + INVALID_OPERATOR
-        }
-    )
-    void shouldIgnoresInvalidOperatorRoutes(String operatorFirstFlight, String operatorSecondFlight)
+    @CsvSource({
+        "false, false",
+        "true, false",
+        "false, true"
+    })
+    void shouldIgnoresInvalidRoutes(boolean firstValid, boolean secondValid)
         throws ExecutionException, InterruptedException {
       // Arrange
-      Route wrongOperator1 = new Route().airportFrom(ORIGIN_AIRPORT).airportTo(INTERMEDIATE_AIRPORT_1).operator(operatorFirstFlight);
-      Route wrongOperator2 = new Route().airportFrom(INTERMEDIATE_AIRPORT_1).airportTo(DESTINATION_AIRPORT).operator(operatorSecondFlight);
+      Route wrongOperator1 = new Route().airportFrom(ORIGIN_AIRPORT).airportTo(INTERMEDIATE_AIRPORT_1).operator(OPERATOR);
+      Route wrongOperator2 = new Route().airportFrom(INTERMEDIATE_AIRPORT_1).airportTo(DESTINATION_AIRPORT).operator(OPERATOR);
+
+      when(routeValidator.isValidRoute(wrongOperator1)).thenReturn(firstValid);
+      when(routeValidator.isValidRoute(wrongOperator2)).thenReturn(secondValid);
 
       when(routesProvider.fetchAllRoutesCached()).thenReturn(List.of(wrongOperator1, wrongOperator2));
 

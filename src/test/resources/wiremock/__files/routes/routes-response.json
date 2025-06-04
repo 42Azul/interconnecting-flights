@@ -34,5 +34,14 @@
     "seasonalRoute": false,
     "operator": "OTHER",
     "group": "ETHNIC"
+  },
+  {
+    "airportFrom": "ALC",
+    "airportTo": "MRS",
+    "connectingAirport": "DUB",
+    "newRoute": false,
+    "seasonalRoute": false,
+    "operator": "RYANAIR",
+    "group": "ETHNIC"
   }
 ]
