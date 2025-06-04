@@ -1,5 +1,7 @@
 package com.ryanair.interconnector.service.impl;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -22,26 +24,30 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
-import reactor.test.StepVerifier;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 @ExtendWith(MockitoExtension.class)
 class InterconnectionServiceImplTest {
 
-  @Mock ScheduleQueryService scheduleQueryService;
-  @Mock RouteQueryService routeQueryService;
-  @Mock ConnectionMapper connectionMapper;
-  @Mock FlightConnectionValidator validator;
+  @Mock
+  ScheduleQueryService scheduleQueryService;
+  @Mock
+  RouteQueryService routeQueryService;
+  @Mock
+  ConnectionMapper connectionMapper;
+  @Mock
+  FlightConnectionValidator validator;
   @Spy
   List<FlightConnectionValidator> validatorList = new ArrayList<>();
 
-  @InjectMocks InterconnectionServiceImpl service;
+  @InjectMocks
+  InterconnectionServiceImpl service;
 
   static final String ORIGIN = "DUB";
   static final String DEST = "WRO";
@@ -68,17 +74,22 @@ class InterconnectionServiceImplTest {
     multiConn.setStops(1);
   }
 
-  private void mockValidSingleLegSetup(){
-    when(routeQueryService.existsDirectRoute(ORIGIN, DEST)).thenReturn(Mono.just(true));
-    when(scheduleQueryService.findFlightSlots(ORIGIN, DEST, SINCE, UNTIL)).thenReturn(Flux.just(slotDirect));
+  private void mockValidSingleLegSetup() {
+    when(routeQueryService.existsDirectRoute(ORIGIN, DEST)).thenReturn(CompletableFuture.completedFuture(true));
+    when(scheduleQueryService.findFlightSlots(ORIGIN, DEST, SINCE, UNTIL)).thenReturn(
+        CompletableFuture.completedFuture(List.of(slotDirect)));
     when(connectionMapper.toSingleLegConnection(ORIGIN, DEST, slotDirect)).thenReturn(Optional.of(directConn));
   }
 
   private void mockValidMultiLegSetup() {
-    when(routeQueryService.intermediateAirports(ORIGIN, DEST)).thenReturn(Mono.just(Set.of(MID)));
-    when(scheduleQueryService.findFlightSlots(ORIGIN, MID, SINCE, UNTIL)).thenReturn(Flux.just(slotFirstLeg));
-    when(scheduleQueryService.findFlightSlots(MID, DEST, SINCE, UNTIL)).thenReturn(Flux.just(slotSecondLeg));
-    when(connectionMapper.toMultiLegConnection(ORIGIN, MID, DEST, slotFirstLeg, slotSecondLeg)).thenReturn(Optional.of(multiConn));
+    when(routeQueryService.intermediateAirports(ORIGIN, DEST)).thenReturn(
+        CompletableFuture.completedFuture(Set.of(MID)));
+    when(scheduleQueryService.findFlightSlots(ORIGIN, MID, SINCE, UNTIL)).thenReturn(
+        CompletableFuture.completedFuture(List.of(slotFirstLeg)));
+    when(scheduleQueryService.findFlightSlots(MID, DEST, SINCE, UNTIL)).thenReturn(
+        CompletableFuture.completedFuture(List.of(slotSecondLeg)));
+    when(connectionMapper.toMultiLegConnection(ORIGIN, MID, DEST, slotFirstLeg, slotSecondLeg)).thenReturn(
+        Optional.of(multiConn));
   }
 
   @Nested
@@ -86,21 +97,20 @@ class InterconnectionServiceImplTest {
 
     @BeforeEach
     void setUp() {
-      when(routeQueryService.intermediateAirports(ORIGIN, DEST)).thenReturn(Mono.just(Set.of()));
+      when(routeQueryService.intermediateAirports(ORIGIN, DEST)).thenReturn(
+          CompletableFuture.completedFuture(Set.of()));
     }
 
     @Test
-    void shouldReturnSingleLegConnectionWhenValidRouteExists() {
+    void shouldReturnSingleLegConnectionWhenValidRouteExists() throws ExecutionException, InterruptedException {
       // Arrange
       mockValidSingleLegSetup();
 
       // Act
-      Flux<Connection> result = service.findInterconnections(ORIGIN, DEST, SINCE, UNTIL);
+      CompletableFuture<List<Connection>> result = service.findInterconnections(ORIGIN, DEST, SINCE, UNTIL);
 
       // Assert
-      StepVerifier.create(result)
-          .expectNext(directConn)
-          .verifyComplete();
+      assertEquals(List.of(directConn), result.get());
 
       // Verify
       verify(connectionMapper).toSingleLegConnection(ORIGIN, DEST, slotDirect);
@@ -110,18 +120,17 @@ class InterconnectionServiceImplTest {
     }
 
     @Test
-    void shouldReturnEmptyWhenNoValidSlotsFound() {
+    void shouldReturnEmptyWhenNoValidSlotsFound() throws ExecutionException, InterruptedException {
       // Arrange
-      when(routeQueryService.existsDirectRoute(ORIGIN, DEST)).thenReturn(Mono.just(true));
-      when(scheduleQueryService.findFlightSlots(ORIGIN, DEST, SINCE, UNTIL)).thenReturn(Flux.empty());
+      when(routeQueryService.existsDirectRoute(ORIGIN, DEST)).thenReturn(CompletableFuture.completedFuture(true));
+      when(scheduleQueryService.findFlightSlots(ORIGIN, DEST, SINCE, UNTIL)).thenReturn(
+          CompletableFuture.completedFuture(List.of()));
 
       // Act
-      Flux<Connection> result = service.findInterconnections(ORIGIN, DEST, SINCE, UNTIL);
+      CompletableFuture<List<Connection>> result = service.findInterconnections(ORIGIN, DEST, SINCE, UNTIL);
 
       // Assert
-      StepVerifier.create(result)
-          .expectComplete()
-          .verify();
+      assertEquals(List.of(), result.get());
 
       // Verify
       verify(scheduleQueryService).findFlightSlots(ORIGIN, DEST, SINCE, UNTIL);
@@ -130,17 +139,15 @@ class InterconnectionServiceImplTest {
     }
 
     @Test
-    void shouldFilterOutSingleLegIfRouteDoesNotExist() {
+    void shouldFilterOutSingleLegIfRouteDoesNotExist() throws ExecutionException, InterruptedException {
       // Arrange
-      when(routeQueryService.existsDirectRoute(ORIGIN, DEST)).thenReturn(Mono.just(false));
+      when(routeQueryService.existsDirectRoute(ORIGIN, DEST)).thenReturn(CompletableFuture.completedFuture(false));
 
       // Act
-      Flux<Connection> result = service.findInterconnections(ORIGIN, DEST, SINCE, UNTIL);
+      CompletableFuture<List<Connection>> result = service.findInterconnections(ORIGIN, DEST, SINCE, UNTIL);
 
       // Assert
-      StepVerifier.create(result)
-          .expectComplete()
-          .verify();
+      assertEquals(List.of(), result.get());
 
       // Verify
       verifyNoInteractions(scheduleQueryService);
@@ -153,61 +160,59 @@ class InterconnectionServiceImplTest {
 
     @BeforeEach
     void setUp() {
-      when(routeQueryService.existsDirectRoute(ORIGIN, DEST)).thenReturn(Mono.just(false));
+      when(routeQueryService.existsDirectRoute(ORIGIN, DEST)).thenReturn(CompletableFuture.completedFuture(false));
       validatorList.clear();
       validatorList.add(validator);
     }
 
     @Test
-    void shouldReturnMultiLegIfIntermediateAirportAndValidSlotsFound() {
+    void shouldReturnMultiLegIfIntermediateAirportAndValidSlotsFound() throws ExecutionException, InterruptedException {
       // Arrange
       mockValidMultiLegSetup();
       when(validator.isValidConnection(any(), any())).thenReturn(true);
 
       // Act
-      Flux<Connection> result = service.findInterconnections(ORIGIN, DEST, SINCE, UNTIL);
+      CompletableFuture<List<Connection>> result = service.findInterconnections(ORIGIN, DEST, SINCE, UNTIL);
 
       // Assert
-      StepVerifier.create(result)
-          .expectNext(multiConn)
-          .verifyComplete();
+      assertEquals(List.of(multiConn), result.get());
 
       // Verify
       verify(connectionMapper).toMultiLegConnection(ORIGIN, MID, DEST, slotFirstLeg, slotSecondLeg);
     }
 
     @Test
-    void shouldFilterOutMultiLegIfValidatorReturnsFalse() {
+    void shouldFilterOutMultiLegIfValidatorReturnsFalse() throws ExecutionException, InterruptedException {
       // Arrange
-      when(routeQueryService.intermediateAirports(ORIGIN, DEST)).thenReturn(Mono.just(Set.of(MID)));
-      when(scheduleQueryService.findFlightSlots(ORIGIN, MID, SINCE, UNTIL)).thenReturn(Flux.just(slotFirstLeg));
-      when(scheduleQueryService.findFlightSlots(MID, DEST, SINCE, UNTIL)).thenReturn(Flux.just(slotSecondLeg));
+      when(routeQueryService.intermediateAirports(ORIGIN, DEST)).thenReturn(
+          CompletableFuture.completedFuture(Set.of(MID)));
+      when(scheduleQueryService.findFlightSlots(ORIGIN, MID, SINCE, UNTIL)).thenReturn(
+          CompletableFuture.completedFuture(List.of(slotFirstLeg)));
+      when(scheduleQueryService.findFlightSlots(MID, DEST, SINCE, UNTIL)).thenReturn(
+          CompletableFuture.completedFuture(List.of(slotSecondLeg)));
       when(validator.isValidConnection(any(), any())).thenReturn(false);
 
       // Act
-      Flux<Connection> result = service.findInterconnections(ORIGIN, DEST, SINCE, UNTIL);
+      CompletableFuture<List<Connection>> result = service.findInterconnections(ORIGIN, DEST, SINCE, UNTIL);
 
       // Assert
-      StepVerifier.create(result)
-          .expectComplete()
-          .verify();
+      assertEquals(List.of(), result.get());
 
       // Verify
       verifyNoInteractions(connectionMapper);
     }
 
     @Test
-    void returnsEmptyWhenNoIntermediateAirports() {
+    void returnsEmptyWhenNoIntermediateAirports() throws ExecutionException, InterruptedException {
       // Arrange
-      when(routeQueryService.intermediateAirports(ORIGIN, DEST)).thenReturn(Mono.just(Set.of()));
+      when(routeQueryService.intermediateAirports(ORIGIN, DEST)).thenReturn(
+          CompletableFuture.completedFuture(Set.of()));
 
       // Act
-      Flux<Connection> result = service.findInterconnections(ORIGIN, DEST, SINCE, UNTIL);
+      CompletableFuture<List<Connection>> result = service.findInterconnections(ORIGIN, DEST, SINCE, UNTIL);
 
       // Assert
-      StepVerifier.create(result)
-          .expectComplete()
-          .verify();
+      assertEquals(List.of(), result.get());
 
       // Verify
       verify(scheduleQueryService, never()).findFlightSlots(any(), any(), any(), any());
@@ -224,21 +229,21 @@ class InterconnectionServiceImplTest {
     }
 
     @Test
-    void returnsBothSingleAndMultiLeg() {
+    void returnsBothSingleAndMultiLeg() throws ExecutionException, InterruptedException {
       // Arrange
       mockValidSingleLegSetup();
       mockValidMultiLegSetup();
       when(validator.isValidConnection(any(), any())).thenReturn(true);
 
       // Act
-      Flux<Connection> result = service.findInterconnections(ORIGIN, DEST, SINCE, UNTIL);
+      CompletableFuture<List<Connection>> result = service.findInterconnections(ORIGIN, DEST, SINCE, UNTIL);
 
       // Assert
-      StepVerifier.create(result.collectList())
-          .expectNextMatches(connections -> connections.size() == 2 &&
-              connections.contains(directConn) &&
-              connections.contains(multiConn))
-          .verifyComplete();
+      List<Connection> resultList = result.get();
+
+      assertEquals(2, resultList.size());
+      assertTrue(resultList.contains(multiConn));
+      assertTrue(resultList.contains(directConn));
 
       // Verify
       verify(connectionMapper).toSingleLegConnection(eq(ORIGIN), eq(DEST), any());

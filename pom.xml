@@ -77,11 +77,6 @@
             <scope>provided</scope>
         </dependency>
 
-        <dependency>
-            <groupId>io.projectreactor</groupId>
-            <artifactId>reactor-core</artifactId>
-        </dependency>
-
         <!-- OpenApi dependencies -->
         <dependency>
             <groupId>io.swagger.core.v3</groupId>
@@ -122,11 +117,6 @@
             <scope>test</scope>
         </dependency>
 
-        <dependency>
-            <groupId>io.projectreactor</groupId>
-            <artifactId>reactor-test</artifactId>
-            <scope>test</scope>
-        </dependency>
 
         <dependency>
             <groupId>io.rest-assured</groupId>
@@ -241,6 +231,7 @@
                                 <useTags>true</useTags>
                                 <skipDefaultInterface>true</skipDefaultInterface>
                                 <useResponseEntity>false</useResponseEntity>
+                                <responseWrapper>CompletableFuture</responseWrapper>
                             </configOptions>
                             <typeMappings>
                                 <typeMapping>local-date-time=LocalDateTime</typeMapping>
