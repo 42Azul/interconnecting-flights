@@ -16,10 +16,9 @@ import java.util.concurrent.Executor;
 import java.util.stream.Stream;
 
 /**
- * Implementation of the ScheduleQueryService that retrieves flight slots
- * for a given route and time range.
- * This service uses a cached provider to fetch schedules to provide a better performance and
- * an executor to handle asynchronous operations in a better way.
+ * Implementation of the ScheduleQueryService that retrieves flight slots for a given route. This service uses a cached
+ * provider to fetch schedules to provide a better performance and an executor to handle asynchronous operations in a
+ * better way.
  */
 
 @Service
@@ -30,7 +29,8 @@ public class ScheduleQueryServiceImpl implements ScheduleQueryService {
   private final Executor externalApiExecutor;
 
   @Autowired
-  public ScheduleQueryServiceImpl(CachedSchedulesProvider schedulesProvider, ScheduleMapper scheduleMapper, @Qualifier("externalApiExecutor") Executor externalApiExecutor) {
+  public ScheduleQueryServiceImpl(CachedSchedulesProvider schedulesProvider, ScheduleMapper scheduleMapper,
+      @Qualifier("externalApiExecutor") Executor externalApiExecutor) {
     this.schedulesProvider = schedulesProvider;
     this.scheduleMapper = scheduleMapper;
     this.externalApiExecutor = externalApiExecutor;
@@ -58,11 +58,10 @@ public class ScheduleQueryServiceImpl implements ScheduleQueryService {
       ScheduleResponse response = schedulesProvider.getScheduleCached(from, to, month.getYear(), month.getMonthValue());
       List<FlightSlot> slots = scheduleMapper.toFlightSlots(month.getYear(), response);
       return slots.stream()
-          .filter(slot -> start.isBefore(slot.departureDateTime()) && end.isAfter(slot.arrivalDateTime()))
+          .filter(slot -> !slot.departureDateTime().isBefore(start) && !slot.arrivalDateTime().isAfter(end))
           .toList();
     }, externalApiExecutor);
   }
-
 
 }
 

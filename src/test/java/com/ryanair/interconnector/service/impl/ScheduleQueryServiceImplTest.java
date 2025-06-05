@@ -86,20 +86,20 @@ class ScheduleQueryServiceImplTest {
     }
 
     @Test
-    void shouldExcludeBoundarySlots() throws ExecutionException, InterruptedException {
+    void shouldIncludeBoundarySlots() throws ExecutionException, InterruptedException {
       // Arrange
       FlightSlot atStart = new FlightSlot(RANGE_START, RANGE_START.plusHours(2));
       FlightSlot atEnd = new FlightSlot(RANGE_END.minusHours(2), RANGE_END);
-      FlightSlot inRange = new FlightSlot(RANGE_START.plusDays(1), RANGE_END.minusDays(1));
-      stubMonth(JAN, atStart, atEnd, inRange);
+      stubMonth(JAN, atStart, atEnd);
 
       // Act
       CompletableFuture<List<FlightSlot>> result = service.findFlightSlots(FROM, TO, RANGE_START, RANGE_END);
 
       // Assert
       List<FlightSlot> resultList = result.get();
-      assertEquals(1, resultList.size());
-      assertEquals(inRange, resultList.get(0));
+      assertEquals(2, resultList.size());
+      assertTrue(resultList.contains(atStart));
+      assertTrue(resultList.contains(atEnd));
 
       // Verify interactions
       verify(schedulesProvider).getScheduleCached(FROM, TO, JAN.getYear(), JAN.getMonthValue());

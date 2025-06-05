@@ -11,3 +11,13 @@ A Spring Boot RESTful API that provides information about direct and interconnec
   - Direct flights
   - Interconnected flights with one stop and minimum 2h delay.
 - Filters results based on provided departure/arrival datetimes.
+
+## Configuration
+
+The size of the asynchronous executor used to call external services can be
+customized in `application.properties` using the following keys:
+
+```properties
+external.api.executor.core-pool-size=10
+external.api.executor.max-pool-size=30
+external.api.executor.queue-capacity=100
