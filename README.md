@@ -1,23 +1,124 @@
-# Ryanair Task - Interconnecting Flights API
+# 🛫 Ryanair Interconnecting Flights API
 
-A Spring Boot RESTful API that provides information about direct and interconnected Ryanair flights (with at most one stop) between two airports, within a specified date-time range.
+A Spring Boot RESTful service that provides available **direct and interconnected flights** (with at most one stop) between two airports, using Ryanair’s Routes and Schedules APIs. The API filters results based on a specified departure and arrival datetime window.
 
-## Features
+---
 
-- Retrieves data from Ryanair public APIs:
-  - **Routes API**: Retrieves valid direct routes (RYANAIR-operated only, no connections).
-  - **Schedules API**: Retrieves flight schedules by month.
-- Supports:
-  - Direct flights
-  - Interconnected flights with one stop and minimum 2h delay.
-- Filters results based on provided departure/arrival datetimes.
+## ✨ Features
 
-## Configuration
+* **Direct Flights**: DUB → STN
+* **Interconnected Flights**: DUB → STN → WRO (max 1 stop, with ≥ 2h stopover)
+* **Datetime Filtering**: Flights must depart at the same time or after `departureDateTime` and arrive at or before `arrivalDateTime`
+* **Data Sources**: Generated via OpenAPI to simplofy model generation and interface definition
 
-The size of the asynchronous executor used to call external services can be
-customized in `application.properties` using the following keys:
+  * `Routes API`: Filtered to use **RYANAIR-operated**, non-connecting flights only
+  * `Schedules API`: Monthly schedules by route
+* **Performance**: Usage of Cache and CompletableFuture to parallelize calls and improve performance of the API.
+* **Exception handling**: Meaningful responses and logging in case an external API is unavailable or any other error happens (like 400).
+
+---
+
+## 🧭 Project Structure
+
+* `client` Feign/OpenAPI clients for external Ryanair APIs
+* `config` Configuration of the different Spring properties, like the Async Executor.
+* `controller` Exposes `/v1/interconnections` REST endpoint
+* `dto` Domain-specific data transfer objects used (only FlightSlot for the time being)
+* `exception` Custom exception hierarchy and error handling logic, including external API failure wrappers
+* `mapping` Model converters between API and domain formats
+* `service` Business logic: schedules, filtering, connection building. It includes the interfaces and the implementations
+* `resources/openapi`OpenAPI specs for internal server and external clients
+* `validation` Composable route and connection validators
+
+---
+
+## 🔧 Build Instructions
+
+```bash
+./mvnw clean package
+```
+
+The executable JAR will be located at:
+
+```
+target/flight-interconnector-soa-api-0.0.1-SNAPSHOT.jar
+```
+
+---
+
+## ▶️ Running the Application
+
+*A requirement to run the application is to have Java 21 in the JAVA_HOME variable*
+
+Run with Maven:
+
+```bash
+./mvnw spring-boot:run
+```
+
+Or directly with Java once the jar is built:
+
+```bash
+java -jar target/flight-interconnector-soa-api-0.0.1-SNAPSHOT.jar
+```
+
+### Example Request
+
+```
+GET /v1/interconnections?departure=DUB&arrival=STN&departureDateTime=2024-01-01T09:00&arrivalDateTime=2024-01-01T22:00
+```
+
+---
+
+## ✅ Testing
+
+This project uses multiple test strategies
+
+* **Unit Tests**
+  Run with:
+
+  ```bash
+  ./mvnw test
+  ```
+
+* **Full Verification (Integration Tests + SpotBugs + Coverage)**
+  Includes:
+
+  * Spring Boot integration tests with WireMock-based mocks for external APIs
+  * Static analysis with SpotBugs
+  * Code coverage reports with JaCoCo
+
+  Run with:
+
+  ```bash
+  ./mvnw verify
+  ```
+---
+
+## ⚙️ Configuration
+
+Tunable async executor settings for external API calls:
 
 ```properties
 external.api.executor.core-pool-size=10
 external.api.executor.max-pool-size=30
 external.api.executor.queue-capacity=100
+```
+
+To control the minimum required layover time between flights for the associated validator
+```properties
+interconnector.min-layover=PT2H               # ISO-8601 duration format (e.g. PT2H = 2 hours)
+```
+
+Also the Routes+Schedules API base url or timeout can be further configured there.
+
+---
+## 💡 Potential Extensions
+
+Though it has not been requested in the task, here there are some potential add-ons to the API.
+
+* **Custom Filtering Logic**: Allow more dynamic route and connection validation, like country specific limitations or other ideas (if they make sense functionally).
+* **Separation of Flight Strategies**: Split direct vs. one-stop logic into distinct components if the logic grows more complex.
+* **Improved Caching Mechanism**: Replace simple `@Cacheable` with a smarter, controllable caching layer (e.g. configurable TTLs, eviction strategies, test-friendly APIs).
+* **Optimality**: Filter out connections that are valid but clearly suboptimal (e.g. extremely long layovers or unnecessary detours).
+* **Client-Side Filtering Support**: Expose additional query parameters to allow consumers to filter results (e.g. max stops, latest arrival time, max total duration).
