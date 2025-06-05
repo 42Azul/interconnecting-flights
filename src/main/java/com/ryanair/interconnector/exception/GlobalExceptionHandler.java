@@ -38,7 +38,7 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(RuntimeException.class)
   public ResponseEntity<Error> handleUnhandledRuntimeException(RuntimeException ex) {
     log.atError()
-        .setMessage("Unhandled exception occurred: , {}")
+        .setMessage("Unhandled exception occurred: {}")
         .addArgument(ex)
         .log();
 

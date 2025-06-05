@@ -11,7 +11,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class CachedSchedulesProvider {
 
-  SchedulesClient schedulesClient;
+  private final SchedulesClient schedulesClient;
 
   @Autowired
   public CachedSchedulesProvider(SchedulesClient schedulesClient) {

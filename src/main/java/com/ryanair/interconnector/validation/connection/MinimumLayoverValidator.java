@@ -7,6 +7,7 @@ import java.time.Duration;
 
 /**
  * Encapsulates the logic to validate flight connections based on minimum layover time.
+ * It will accept a layover if the waiting time is equals or more than a given duration.
  */
 @Component
 public class MinimumLayoverValidator implements  FlightConnectionValidator {
@@ -24,8 +25,8 @@ public class MinimumLayoverValidator implements  FlightConnectionValidator {
       return false;
     }
 
-    return firstSlot.arrivalDateTime()
-                .plus(minConnectionTime)
-                .isBefore(secondSlot.departureDateTime());
+    return !firstSlot.arrivalDateTime()
+        .plus(minConnectionTime)
+        .isAfter(secondSlot.departureDateTime());
   }
 }

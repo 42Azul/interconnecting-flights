@@ -12,7 +12,7 @@ import java.util.concurrent.CompletableFuture;
 public interface ScheduleQueryService {
 
     /**
-     * Finds direct available flight slots between two locations within a specified date and time range.
+     * Finds direct available flight slots between two locations within a specified date and time range (extremes included)
      * @param from Origin airport code in IATA format (e.g., "DUB" for Dublin).
      * @param to Destination airport code in IATA format (e.g., "LON" for London).
      * @param start LocalDateTime representing the start of the search range (e.g , 2023-10-01T08:00:00).

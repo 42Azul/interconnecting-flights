@@ -26,16 +26,16 @@ class MinimumLayoverValidatorTest {
     @ParameterizedTest
     @CsvSource({
         "50, 51, true",
-        "50, 50, false",
-        "50, 49, false"
+        "40, 40, true",
+        "30, 29, false"
     })
-    void shouldValidateLayover(int minRequired, int layoverMin, boolean expected) {
+    void shouldValidateLayover(int minimumLayoverTime, int flightGapInMinutes, boolean expected) {
       // Arrange
       FlightSlot first = new FlightSlot(DEPARTURE, ARRIVAL);
-      LocalDateTime secondDep = ARRIVAL.plusMinutes(layoverMin);
+      LocalDateTime secondDep = ARRIVAL.plusMinutes(flightGapInMinutes);
       FlightSlot second = new FlightSlot(secondDep, secondDep.plusHours(2));
       MinimumLayoverValidator validator =
-          new MinimumLayoverValidator(Duration.ofMinutes(minRequired));
+          new MinimumLayoverValidator(Duration.ofMinutes(minimumLayoverTime));
 
       // Act
       boolean result = validator.isValidConnection(first, second);
