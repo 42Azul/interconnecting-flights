@@ -1,4 +1,4 @@
-package com.ryanair.interconnector.validation;
+package com.ryanair.interconnector.validation.connection;
 
 import com.ryanair.interconnector.dto.FlightSlot;
 import org.springframework.beans.factory.annotation.Value;

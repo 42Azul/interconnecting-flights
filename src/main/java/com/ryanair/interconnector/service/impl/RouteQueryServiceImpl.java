@@ -3,32 +3,41 @@ package com.ryanair.interconnector.service.impl;
 import com.ryanair.interconnectingflights.external.model.Route;
 import com.ryanair.interconnector.client.CachedRoutesProvider;
 import com.ryanair.interconnector.service.RouteQueryService;
+import com.ryanair.interconnector.validation.route.RouteValidator;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
 /**
  * Service implementation for querying flight routes.
- * This implementation filter routes by the operator "RYANAIR" and uses cached routes for performance as well as custom executor
+ * This implementation filter routes by the different validators and uses the cached routes provider
  * for the asynchronous operations.
  */
 
 @Service
 public class RouteQueryServiceImpl implements RouteQueryService {
 
-  private static final String OPERATOR = "RYANAIR";
 
   private final CachedRoutesProvider routesProvider;
   private final Executor externalApiExecutor;
+  private final List<RouteValidator> routeValidators;
 
+  @SuppressFBWarnings(
+      value = "EI_EXPOSE_REP2",
+      justification = "List is injected by Spring and not exposed"
+  )
   @Autowired
-  public RouteQueryServiceImpl(CachedRoutesProvider routesProvider, @Qualifier("externalApiExecutor") Executor externalApiExecutor) {
+  public RouteQueryServiceImpl(CachedRoutesProvider routesProvider, @Qualifier("externalApiExecutor") Executor externalApiExecutor,
+                               List<RouteValidator> routeValidators) {
     this.routesProvider = routesProvider;
     this.externalApiExecutor = externalApiExecutor;
+    this.routeValidators = routeValidators;
   }
 
   @Override
@@ -63,7 +72,7 @@ public class RouteQueryServiceImpl implements RouteQueryService {
   }
 
   private boolean isValidRoute(Route route) {
-    return OPERATOR.equals(route.getOperator());
+    return routeValidators.stream().allMatch(validator -> validator.isValidRoute(route));
   }
 
 }

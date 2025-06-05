@@ -15,7 +15,7 @@ import com.ryanair.interconnector.dto.FlightSlot;
 import com.ryanair.interconnector.mapping.ConnectionMapper;
 import com.ryanair.interconnector.service.RouteQueryService;
 import com.ryanair.interconnector.service.ScheduleQueryService;
-import com.ryanair.interconnector.validation.FlightConnectionValidator;
+import com.ryanair.interconnector.validation.connection.FlightConnectionValidator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
